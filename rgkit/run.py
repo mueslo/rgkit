@@ -36,9 +36,7 @@ parser.add_argument("player2",
                     help="File containing second robot class definition.")
 parser.add_argument("-m", "--map",
                     help="User-specified map file.",
-                    type=argparse.FileType('r'),
-                    default=pkg_resources.resource_filename('rgkit',
-                                                            'maps/default.py'))
+                    default="default")
 parser.add_argument("-c", "--count", type=int,
                     default=1,
                     help="Game count, default: 1, multithreading if >1")
@@ -202,8 +200,7 @@ def main():
     if args.quiet >= 3:
         mute_all()
 
-    map_data = ast.literal_eval(args.map.read())
-    game.init_settings(map_data)
+    game.init_settings(args.map)
     print('Game seed: {0}'.format(args.game_seed))
 
     runner = test_runs_sequentially

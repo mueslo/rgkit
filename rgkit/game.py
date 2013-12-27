@@ -11,6 +11,7 @@ except ImportError:
 from rgkit import rg
 from rgkit.gamestate import GameState
 from rgkit.settings import settings
+from rgkit.maps import maps
 
 sys.modules['rg'] = rg  # preserve backwards compatible robot imports
 
@@ -20,9 +21,15 @@ class NullDevice(object):
         pass
 
 
-def init_settings(map_data):
+def init_settings(map_name):
     # I'll get rid of the globals. I promise.
     global settings
+    print "map is",maps.available[map_name]
+    print maps.available[map_name].config
+    print "squ ma",maps.available["square"].checksum,maps.available["square"]
+    print maps.available["square"].config
+    print "def ma",maps.available["default"].checksum,maps.available["default"]
+    map_data = maps.available[map_name].config
     settings.spawn_coords = map_data['spawn']
     settings.obstacles = map_data['obstacle']
     settings.start1 = map_data['start1']
