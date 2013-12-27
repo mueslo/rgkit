@@ -80,7 +80,6 @@ class Render(object):
         # Animation stuff (also see #render heading in settings.py)
         self._sprites = []
         self._highlight_sprite = None
-        self._t_paused = 0
         self._t_frame_start = 0
         self._t_next_frame = 0
         self._t_cursor_start = 0
@@ -119,7 +118,6 @@ class Render(object):
 
             self.size_changed = False
             self._win.delete("all")
-            # print "Size changed, adjusting cell size..."
 
             self._winsize = min(self._board_frame.winfo_width(),
                                 self._board_frame.winfo_height())
@@ -152,7 +150,6 @@ class Render(object):
             text=u'\u25B6' if self._paused else u'\u25FC')
         now = millis()
         if self._paused:
-            self._t_paused = now
             self._sub_turn = 0.0
         else:
             self.update_frame_start_time(now)
@@ -186,10 +183,8 @@ class Render(object):
             x = (event.x - self.board_margin / 2) / self._blocksize
             y = (event.y - self.board_margin / 2) / self._blocksize
             loc = (x, y)
-            if (loc[0] >= 0 and
-                    loc[1] >= 0 and
-                    loc[0] < self._settings.board_size and
-                    loc[1] < self._settings.board_size):
+            if (0 <= x < self._settings.board_size and
+                    0 <= y < self._settings.board_size):
                 if loc == self._highlighted:
                     self._highlighted = None
                 else:
@@ -289,23 +284,17 @@ class Render(object):
 
     def update_info_frame(self):
         display_turn = self.current_turn_int()
+        display_state = self._game.get_state(display_turn)
         max_turns = self._settings.max_turns
-        count_turn = int(math.ceil(self._turn + self._sub_turn))
-        if count_turn > self._settings.max_turns:
-            count_turn = self._settings.max_turns
-        if count_turn < 0:
-            count_turn = 0
-        red, blue = self._game.get_state(count_turn).get_scores()
+        red, blue = display_state.get_scores()
         info = ''
         currentAction = ''
         if self._highlighted is not None:
-            squareinfo = self.get_square_info(self._highlighted)
-            if 'obstacle' in squareinfo:
+            if self._highlighted in self._settings.obstacles:
                 info = 'Obstacle'
-            elif 'bot' in squareinfo:
-                robot_id = self._game.get_state(display_turn) \
-                    .robots[self._highlighted].robot_id
-                info = 'Bot %d ' % (robot_id,)
+            elif display_state.is_robot(self._highlighted):
+                robot = display_state.robots[self._highlighted]
+                info = 'Bot %d ' % (robot.robot_id,)
 
         r_text = '%s: %d' % (self._names[0], red)
         g_text = '%s: %d' % (self._names[1], blue)
@@ -321,16 +310,6 @@ class Render(object):
     def current_turn_int(self):
         return min(int(math.floor(self._turn + self._sub_turn)),
                    self._settings.max_turns)
-
-    def get_square_info(self, loc):
-        if loc in self._settings.obstacles:
-            return ['obstacle']
-
-        all_bots = self._game.get_actions_on_turn(self.current_turn_int())
-        if loc in all_bots:
-            return ['bot', all_bots[loc]]
-
-        return ['normal']
 
     def update_slider_value(self):
         v = -self._time_slider.get()
@@ -373,7 +352,7 @@ class Render(object):
 
         self.update_block_size()
 
-    def determine_bg_color(self, loc):
+    def get_bg_color(self, loc):
         if loc in self._settings.obstacles:
             return rgb_to_hex(*self._settings.obstacle_color)
         return rgb_to_hex(*self._settings.normal_color)
@@ -384,7 +363,7 @@ class Render(object):
             for x in range(self._settings.board_size):
                 loc = (x, y)
                 self.draw_grid_object(
-                    loc, fill=self.determine_bg_color(loc), layer=1, width=0)
+                    loc, fill=self.get_bg_color(loc), layer=1, width=0)
         # draw text labels
         text_color = rgb_to_hex(*self._settings.text_color)
         for y in range(self._settings.board_size):
@@ -399,17 +378,11 @@ class Render(object):
         self.update_highlight_sprite()
         turn_action = self.current_turn_int()
         bots_activity = self._game.get_actions_on_turn(turn_action)
-        try:
-            for bot_data in bots_activity.values():
-                self._sprites.append(RobotSprite(bot_data, self))
-        except:
-            print "PROBLEM UPDATING SPRITES..? bots at turn {0} {1}:".format(
-                turn_action, bots_activity)
+        for bot_data in bots_activity.values():
+            self._sprites.append(RobotSprite(bot_data, self))
 
     def update_highlight_sprite(self, repaint=False):
-        need_update = (self._highlight_sprite is not None and
-                       self._highlight_sprite.location != self._highlighted)
-        if self._highlight_sprite is not None or need_update:
+        if self._highlight_sprite is not None:
             self._highlight_sprite.clear()
         self._highlight_sprite = HighlightSprite(
             self._highlighted, self._highlighted_target, self)
@@ -438,13 +411,9 @@ class Render(object):
         return (x + self._blocksize - self.cell_border_width,
                 y + self._blocksize - self.cell_border_width)
 
-    def grid_bbox(self, loc, width=25):
+    def grid_bbox(self, loc):
         x, y = self.grid_to_xy(loc)
-        x += (self._blocksize - self.cell_border_width) / 2.
-        y += (self._blocksize - self.cell_border_width) / 2.
-        halfwidth = self._blocksize / 2.
-        halfborder = self.cell_border_width / 2.
-        return (int(x - halfwidth + halfborder),
-                int(y - halfwidth + halfborder),
-                int(x + halfwidth - halfborder),
-                int(y + halfwidth - halfborder))
+        return (int(x),
+                int(y),
+                int(x + self._blocksize - self.cell_border_width),
+                int(y + self._blocksize - self.cell_border_width))
